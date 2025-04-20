@@ -119,15 +119,15 @@ def generate_theme(keyword=None, specific=False):
     if specific and keyword:
         # --- Step 1: 具体名を取得 ---
         specific_item = None
-        last_generated_item = None # 前回生成されたアイテムを記録
-        consecutive_duplicates = 0 # 連続重複回数を記録
-        for attempt in range(STEP1_MAX_RETRIES): # 新しい変数を使用
+        generated_specific_items = []
+        
+        for attempt in range(STEP1_MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{STEP1_MAX_RETRIES}")
-
-            avoid_instruction = "" # 避ける指示を初期化
-            if consecutive_duplicates >= 3 and last_generated_item:
-                avoid_instruction = f"\n**重要:** 前回の試行で生成された「{last_generated_item}」は**絶対に避けてください**。"
-                print(f"    -> 「{last_generated_item}」を避けるように指示を追加")
+            
+            avoid_instruction = ""
+            if attempt > 0 and generated_specific_items:
+                avoid_instruction = f"\n**重要:** 以下の具体名は**絶対に避けてください**: {', '.join(generated_specific_items)}"
+                print(f"    -> 避ける具体名: {', '.join(generated_specific_items)}")
 
             step1_prompt = f"""
 キーワード「{keyword}」に関連する**完全な固有名詞または特定のキャラクター/作品名**を**1つだけ**挙げてください。{avoid_instruction}
@@ -136,54 +136,34 @@ def generate_theme(keyword=None, specific=False):
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
 出力は、選んだ具体名**だけ**をテキストで返してください。例：「織田信長」
-既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50)
 
-            potential_item = None # ループの先頭でリセット
             if error:
                 print(f"Step 1 エラー: {error}")
-                # エラー時は重複カウントをリセット
-                last_generated_item = None
-                consecutive_duplicates = 0
-                if error == "APIキー認証エラー": break # 認証エラーならリトライしない
-                continue # 他のエラーならリトライ
+                if error == "APIキー認証エラー": break
+                continue
 
             elif content:
-                # 簡単なバリデーション
                 potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
-                if 0 < len(potential_item) < 50: # Basic validation
+                if 0 < len(potential_item) < 50:
                     print(f"    -> 取得候補: 「{potential_item}」")
-                    if potential_item == last_generated_item:
-                        # Same item generated again
-                        consecutive_duplicates += 1
-                        print(f"    -> 連続重複 {consecutive_duplicates} 回目")
-                        if consecutive_duplicates >= 3:
-                            # Too many duplicates, continue loop to force a different item next time
-                            print(f"    -> 3回以上連続重複のため、再試行します。")
-                            # last_generated_item は維持して avoid_instruction で使う
-                            continue # Skip to next iteration
-                        else:
-                            # Not yet 3 duplicates, but still a duplicate, so try again
-                            print(f"    -> 重複のため、再試行します。")
-                            # last_generated_item は維持
-                            continue # Skip to next iteration
-                    else:
-                        # Different item generated - This is what we want!
-                        specific_item = potential_item # Accept the new item
+                    if potential_item not in generated_specific_items:
+                        specific_item = potential_item
+                        generated_specific_items.append(specific_item)  # 生成された具体名をリストに追加
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                        last_generated_item = potential_item # Update tracker
-                        consecutive_duplicates = 1 # Reset counter
-                        break # Exit the loop
-                else: # Validation failed
+                        break
+                    else:
+                        print(f"    -> 重複のため、再試行します: {potential_item}")
+                        generated_specific_items.append(potential_item)  # 重複した具体名も記録
+                else:
                     print(f"Step 1 取得内容が不適切: {content}")
-                    last_generated_item = None # リセット
-                    consecutive_duplicates = 0 # リセット
-            else: # content is empty
-                 print("Step 1 応答が空でした。")
-                 last_generated_item = None # リセット
-                 consecutive_duplicates = 0 # リセット
-            # リトライ時は last_generated_item と consecutive_duplicates は維持される
+            else:
+                print("Step 1 応答が空でした。")
+            
+            if attempt == STEP1_MAX_RETRIES - 1:
+                print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
+                return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
 
         if not specific_item:
             print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
@@ -233,12 +213,9 @@ def generate_theme(keyword=None, specific=False):
                     theme = theme_data.get("theme")
                     hint = theme_data.get("hint")
 
-                    if theme and hint and theme not in generated_themes:
-                        generated_themes.add(theme)
+                    if theme and hint:
                         print(f"Step 2 成功: テーマ「{theme}」")
                         return {"theme": theme, "hint": hint}
-                    elif theme in generated_themes:
-                        print(f"Step 2 テーマ重複: {theme}")
                     else:
                         print(f"Step 2 JSON形式不正: {content}")
 
@@ -257,7 +234,7 @@ def generate_theme(keyword=None, specific=False):
         NORMAL_MAX_RETRIES = 3 # ここでは仮に3回
         for attempt in range(NORMAL_MAX_RETRIES):
             print(f"通常生成試行 {attempt + 1}/{NORMAL_MAX_RETRIES}")
-            # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを生成
+            # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを
             full_prompt = create_prompt(keyword, specific=False) # specific=False を明示
             # JSON形式を期待するプロンプトなので、system メッセージも調整
             system_message = "あなたは楽しい会話のテーマをJSON形式で考えるアシスタントです。"
@@ -276,12 +253,9 @@ def generate_theme(keyword=None, specific=False):
                     theme = theme_data.get("theme")
                     hint = theme_data.get("hint")
 
-                    if theme and hint and theme not in generated_themes:
-                        generated_themes.add(theme)
+                    if theme and hint:
                         print(f"通常生成成功: テーマ「{theme}」")
                         return {"theme": theme, "hint": hint}
-                    elif theme in generated_themes:
-                        print(f"通常生成 テーマ重複: {theme}")
                     else:
                         print(f"通常生成 JSON形式不正: {content}")
                 except json.JSONDecodeError:
@@ -300,6 +274,8 @@ def index():
 
 @app.route('/spin')
 def spin():
+    global generated_themes
+    generated_themes = set()  # generated_themesをリセット
     keyword = request.args.get('keyword')
     # specific パラメータを取得 (文字列 'true' かどうかで判定)
     is_specific = request.args.get('specific') == 'true'
