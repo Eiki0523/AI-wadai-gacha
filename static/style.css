@@ -82,22 +82,6 @@ h1 {
     color: #aaa; /* 色を少し薄くする（任意） */
 }
 
-#add-btn {
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    padding: 0 1.5rem;
-    font-size: 1rem;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-#add-btn:hover {
-    background-color: #45a049;
-    transform: scale(1.05);
-}
-
 .gacha-machine {
     margin-top: 1rem;
     min-height: 220px;
@@ -116,13 +100,11 @@ h1 {
     display: block;
 }
 
-#capsule-image, #capsule-open-image {
+#capsule-image { /* #capsule-open-image を削除 */
     display: none;
 }
 
-.gacha-image.active {
-    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-}
+/* .gacha-image.active (shake animation) を削除 */
 
 .capsule-image {
     transition: transform 0.3s;

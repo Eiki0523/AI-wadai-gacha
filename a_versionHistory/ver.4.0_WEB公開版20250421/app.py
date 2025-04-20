@@ -1,4 +1,5 @@
 from flask import Flask, render_template, jsonify, request
+import random
 import requests
 import json
 import os # osモジュールを追加
