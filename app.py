@@ -171,21 +171,19 @@ def generate_theme(keyword=None, specific=False):
                     else:
                         # Different item generated - This is what we want!
                         specific_item = potential_item # Accept the new item
-                        last_generated_item = potential_item # Update tracker for next potential duplicate check
-                        consecutive_duplicates = 0 # Reset counter as we have a new item
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                        break # Exit the loop successfully
+                        last_generated_item = potential_item # Update tracker
+                        consecutive_duplicates = 1 # Reset counter
+                        break # Exit the loop
                 else: # Validation failed
                     print(f"Step 1 取得内容が不適切: {content}")
-                    # Reset duplicate tracking as the content was invalid
-                    last_generated_item = None
-                    consecutive_duplicates = 0
+                    last_generated_item = None # リセット
+                    consecutive_duplicates = 0 # リセット
             else: # content is empty
                  print("Step 1 応答が空でした。")
-                 # 応答が空でも重複カウントはリセット
-                 last_generated_item = None
-                 consecutive_duplicates = 0
-            # 成功しなかった場合 (3回重複含む) はリトライ
+                 last_generated_item = None # リセット
+                 consecutive_duplicates = 0 # リセット
+            # リトライ時は last_generated_item と consecutive_duplicates は維持される
 
         if not specific_item:
             print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
