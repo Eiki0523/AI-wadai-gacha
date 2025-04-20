@@ -19,8 +19,8 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 生成済みテーマを記録するセット
 generated_themes = set()
 
-# プロンプトを生成するヘルパー関数
-def create_prompt(keyword=None, specific=False):
+# プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
+def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
     base_prompt = """
     形式は以下のJSON形式で返してください。
     {
@@ -52,24 +52,14 @@ def create_prompt(keyword=None, specific=False):
     - 今までに生成した以下のテーマとは被らないように: {existing_themes}
     """
 
-    if specific and keyword:
-        # 「より具体的に」がチェックされている場合
-        instruction = f"""
-キーワード「{keyword}」に関連する具体的な要素（例：キャラクター名、乗り物の種類、作品名など）を**1つだけ**挙げてください。
-例：
-- キーワードが「乗り物」なら、「飛行機」や「潜水艦」など具体的な乗り物を1つ。
-- キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
-- キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
-
-このように、抽象的なカテゴリではなく、**特定の固有名詞や種類名を1つだけ**選び、その選んだ要素に関連した**雑談に使える楽しい話題**を1つ考えてください。
-"""
-        prompt = instruction + base_prompt
-    elif keyword:
-        # キーワードのみ指定されている場合
+    # specific=True の場合のプロンプト生成は generate_theme 内の step1_prompt/step2_prompt で直接行うため、
+    # この関数では specific=False または keyword なしの場合のみを扱う。
+    if keyword:
+        # キーワードあり、かつ specific=False の場合
         instruction = f"「{keyword}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください。"
         prompt = instruction + base_prompt
     else:
-        # キーワードなしの場合
+        # キーワードなしの場合 (specific=False)
         instruction = "明るく楽しい雑談テーマを1つ考えてください。"
         prompt = instruction + base_prompt
 
@@ -130,7 +120,7 @@ def generate_theme(keyword=None, specific=False):
         for attempt in range(MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
             step1_prompt = f"""
-キーワード「{keyword}」に関連する具体的な対象（固有名詞や種類名）を**1つだけ**挙げてください。
+キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**挙げてください。
 例：
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
@@ -165,13 +155,13 @@ def generate_theme(keyword=None, specific=False):
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
             step2_prompt = f"""
-「{specific_item}」というテーマについて、**雑談に使える楽しい話題**を1つ考えてください。
+「{specific_item}」というキーワードに必ず関連した、楽しい雑談テーマを1つ考えてください。
 
 形式は以下のJSON形式で**必ず**返してください。
 ```json
 {{
     "theme": "具体的な話題",
-    "hint": "会話のきっかけ（豆知識、質問、あるある、小ネタなど）"
+    "hint": "会話のきっかけ"
 }}
 ```
 例：
