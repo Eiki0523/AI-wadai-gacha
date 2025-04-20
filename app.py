@@ -69,7 +69,7 @@ def create_prompt(keyword=None, specific=False): # specific引数はgenerate_the
     return full_prompt
 
 # API呼び出しを行うヘルパー関数
-def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.9, max_tokens=150):
+def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=1.7, max_tokens=150):
     if not OPENROUTER_API_KEY:
         print("エラー: APIキーが設定されていません。")
         return None, "APIキー未設定エラー"
