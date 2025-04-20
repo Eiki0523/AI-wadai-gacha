@@ -19,9 +19,6 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 生成済みテーマを記録するセット
 generated_themes = set()
 
-#キーワードごとの具体名生成履歴を保持
-specific_items_history = {}
-
 # プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
 def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
     base_prompt = """
@@ -72,7 +69,7 @@ def create_prompt(keyword=None, specific=False): # specific引数はgenerate_the
     return full_prompt
 
 # API呼び出しを行うヘルパー関数
-def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.8, max_tokens=150):
+def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.7, max_tokens=150):
     if not OPENROUTER_API_KEY:
         print("エラー: APIキーが設定されていません。")
         return None, "APIキー未設定エラー"
@@ -115,71 +112,50 @@ def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.8, ma
 
 # テーマ生成関数（2ステップ対応版）
 def generate_theme(keyword=None, specific=False):
-    # MAX_RETRIES は各ステップ内で定義
-    STEP1_MAX_RETRIES = 5 # Step 1 の最大試行回数を増やす
-    STEP2_MAX_RETRIES = 3
+    MAX_RETRIES = 3
 
     if specific and keyword:
         # --- Step 1: 具体名を取得 ---
         specific_item = None
-        # 過去に出た具体名をキーワードごとに保持し、avoid指示に利用する
-        generated_specific_items = specific_items_history.setdefault(keyword, [])
-        
-        for attempt in range(STEP1_MAX_RETRIES):
-            print(f"Step 1: 具体名取得試行 {attempt + 1}/{STEP1_MAX_RETRIES}")
-            
-            avoid_instruction = ""
-            if attempt > 0 and generated_specific_items:
-                avoid_instruction = f"\n**重要:** 以下の具体名は**絶対に避けてください**: {', '.join(generated_specific_items)}"
-                print(f"    -> 避ける具体名: {', '.join(generated_specific_items)}")
-
+        for attempt in range(MAX_RETRIES):
+            print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
             step1_prompt = f"""
-キーワード「{keyword}」に関連する**完全な固有名詞または特定のキャラクター/作品名**を**1つだけ**挙げてください。{avoid_instruction}
+キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**単語で挙げてください。
 例：
-- キーワードが「戦国武将」なら、「織田信長」や「武田信玄」など具体的な武将名を1つ。
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
-出力は、選んだ具体名**だけ**をテキストで返してください。例：「織田信長」
+出力は、選んだ具体名**だけ**をテキストで返してください。例：「飛行機」
+既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
-            content, error = call_openrouter_api(step1_prompt, max_tokens=50)
+            content, error = call_openrouter_api(step1_prompt, max_tokens=50) # 具体名なので短いトークンで十分
 
             if error:
                 print(f"Step 1 エラー: {error}")
-                if error == "APIキー認証エラー": break
-                continue
+                if error == "APIキー認証エラー": break # 認証エラーならリトライしない
+                continue # 他のエラーならリトライ
 
-            elif content:
-                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
-                if 0 < len(potential_item) < 50:
-                    print(f"    -> 取得候補: 「{potential_item}」")
-                    if potential_item not in generated_specific_items:
-                        specific_item = potential_item
-                        # 永続的な履歴にも追加
-                        specific_items_history[keyword].append(specific_item)
-                        print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                        break
-                    else:
-                        print(f"    -> 重複のため、再試行します: {potential_item}")
-                        generated_specific_items.append(potential_item)  # 重複した具体名も記録
+            if content:
+                # 簡単なバリデーション（空でないか、長すぎないかなど）
+                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "") # 不要な文字を除去
+                if 0 < len(potential_item) < 50: # 短すぎず長すぎない
+                    specific_item = potential_item
+                    print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                    break # 成功したらループを抜ける
                 else:
                     print(f"Step 1 取得内容が不適切: {content}")
             else:
-                print("Step 1 応答が空でした。")
-            
-            if attempt == STEP1_MAX_RETRIES - 1:
-                print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
-                return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
+                 print("Step 1 応答が空でした。")
+            # 成功しなかった場合はリトライ
 
         if not specific_item:
-            print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
+            print("Step 1: 最大試行回数でも具体名を取得できませんでした。")
             return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
 
         # --- Step 2: 具体名から話題を生成 ---
-        # Step 2 のリトライ回数を使用
-        for attempt in range(STEP2_MAX_RETRIES):
-            print(f"Step 2: 話題生成試行 {attempt + 1}/{STEP2_MAX_RETRIES} (具体名: {specific_item})")
+        for attempt in range(MAX_RETRIES):
+            print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
             step2_prompt = f"""
-「{specific_item}」というキーワード({keyword}に含まれる)に必ず関連した、楽しい雑談テーマを1つ考えてください。
+「{specific_item}」というキーワードに必ず関連した、楽しい雑談テーマを1つ考えてください。
 
 形式は以下のJSON形式で**必ず**返してください。
 ```json
@@ -201,7 +177,7 @@ def generate_theme(keyword=None, specific=False):
     "hint": "あの大量の砂を捌いて完全勝利を収めるにはどうすれば良いか考えてみよう"
 }}
 ```
- 生成済みのテーマとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
+生成済みのテーマとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step2_prompt) # 通常のトークン数
 
@@ -218,9 +194,12 @@ def generate_theme(keyword=None, specific=False):
                     theme = theme_data.get("theme")
                     hint = theme_data.get("hint")
 
-                    if theme and hint:
+                    if theme and hint and theme not in generated_themes:
+                        generated_themes.add(theme)
                         print(f"Step 2 成功: テーマ「{theme}」")
                         return {"theme": theme, "hint": hint}
+                    elif theme in generated_themes:
+                        print(f"Step 2 テーマ重複: {theme}")
                     else:
                         print(f"Step 2 JSON形式不正: {content}")
 
@@ -235,11 +214,9 @@ def generate_theme(keyword=None, specific=False):
 
     else:
         # --- specific=False または keywordなし の場合 (従来通り) ---
-        # 通常生成のリトライ回数 (Step 2 と同じで良いか、別途定義するか)
-        NORMAL_MAX_RETRIES = 3 # ここでは仮に3回
-        for attempt in range(NORMAL_MAX_RETRIES):
-            print(f"通常生成試行 {attempt + 1}/{NORMAL_MAX_RETRIES}")
-            # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを
+        for attempt in range(MAX_RETRIES):
+            print(f"通常生成試行 {attempt + 1}/{MAX_RETRIES}")
+            # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを生成
             full_prompt = create_prompt(keyword, specific=False) # specific=False を明示
             # JSON形式を期待するプロンプトなので、system メッセージも調整
             system_message = "あなたは楽しい会話のテーマをJSON形式で考えるアシスタントです。"
@@ -258,9 +235,12 @@ def generate_theme(keyword=None, specific=False):
                     theme = theme_data.get("theme")
                     hint = theme_data.get("hint")
 
-                    if theme and hint:
+                    if theme and hint and theme not in generated_themes:
+                        generated_themes.add(theme)
                         print(f"通常生成成功: テーマ「{theme}」")
                         return {"theme": theme, "hint": hint}
+                    elif theme in generated_themes:
+                        print(f"通常生成 テーマ重複: {theme}")
                     else:
                         print(f"通常生成 JSON形式不正: {content}")
                 except json.JSONDecodeError:
