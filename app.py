@@ -19,6 +19,9 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 生成済みテーマを記録するセット
 generated_themes = set()
 
+#キーワードごとの具体名生成履歴を保持
+specific_items_history = {}
+
 # プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
 def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
     base_prompt = """
@@ -119,7 +122,8 @@ def generate_theme(keyword=None, specific=False):
     if specific and keyword:
         # --- Step 1: 具体名を取得 ---
         specific_item = None
-        generated_specific_items = []
+        # 過去に出た具体名をキーワードごとに保持し、avoid指示に利用する
+        generated_specific_items = specific_items_history.setdefault(keyword, [])
         
         for attempt in range(STEP1_MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{STEP1_MAX_RETRIES}")
@@ -150,7 +154,8 @@ def generate_theme(keyword=None, specific=False):
                     print(f"    -> 取得候補: 「{potential_item}」")
                     if potential_item not in generated_specific_items:
                         specific_item = potential_item
-                        generated_specific_items.append(specific_item)  # 生成された具体名をリストに追加
+                        # 永続的な履歴にも追加
+                        specific_items_history[keyword].append(specific_item)
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
                         break
                     else:
@@ -196,7 +201,7 @@ def generate_theme(keyword=None, specific=False):
     "hint": "あの大量の砂を捌いて完全勝利を収めるにはどうすれば良いか考えてみよう"
 }}
 ```
-生成済みのテーマとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
+ 生成済みのテーマとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step2_prompt) # 通常のトークン数
 
