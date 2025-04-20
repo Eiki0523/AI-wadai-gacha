@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI雑談ガチャ</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>AI雑談ガチャ</h1>
+        <div class="search-box">
+            <input type="text" id="keyword-input" placeholder="話題に含めたいキーワードを入力">
+            <button id="search-btn">検索</button>
+        </div>
+        <div class="gacha-machine">
+        <img src="/static/gacha.png" alt="ガチャマシン" id="gacha-image">
+        <img src="/static/capsule.png" alt="カプセル" id="capsule-image" style="display:none">
+        <div id="result" style="display:none">
+            <div id="result-container">
+                <div id="result-background"></div>
+                <h2 id="theme-title"></h2>
+                <p id="theme-hint"></p>
+            </div>
+        </div>
+        <button id="spin-btn">ガチャを回す</button>
+    </div>
+    </div>
+    <script>
+        async function getTheme(url) {
+            const btn = document.getElementById('spin-btn');
+            const gachaImage = document.getElementById('gacha-image');
+            const capsuleImage = document.getElementById('capsule-image');
+            const resultDiv = document.getElementById('result');
+            
+            btn.disabled = true;
+            resultDiv.style.display = 'none';
+            
+            // ガチャを非表示、カプセルを表示（アニメーション付き）
+            gachaImage.style.display = 'none';
+            capsuleImage.style.display = 'block';
+            
+            // アニメーション確実化のための初期化
+            capsuleImage.classList.remove('active');
+            void capsuleImage.offsetWidth; // レイアウトリフロー強制
+            capsuleImage.classList.add('active');
+            
+            // サーバーからテーマを取得
+            const response = await fetch(url);
+            const theme = await response.json();
+            
+            // カプセルを非表示、開封カプセルを表示
+            setTimeout(() => {
+                capsuleImage.style.display = 'none';
+                
+                // テーマとヒントを表示
+                document.getElementById('theme-title').textContent = theme.theme;
+                document.getElementById('theme-hint').textContent = `ヒント: ${theme.hint}`;
+                
+                // 結果を表示
+                resultDiv.style.display = 'block';
+                btn.disabled = false;
+            }, 1000);
+        }
+
+        document.getElementById('spin-btn').addEventListener('click', async () => {
+            await getTheme('/spin');
+        });
+
+        document.getElementById('search-btn').addEventListener('click', async () => {
+            const keyword = document.getElementById('keyword-input').value.trim();
+            if (keyword) {
+                await getTheme(`/spin?keyword=${encodeURIComponent(keyword)}`);
+            }
+        });
+    </script>
+</body>
+</html>

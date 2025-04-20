@@ -1,0 +1,135 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #52E8E8;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.container {
+    text-align: center;
+    background-color: white;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    max-width: 500px;
+    width: 90%;
+}
+
+h1 {
+    color: #EF1B69;
+    margin-bottom: 2rem;
+    font-weight: bold;
+}
+
+.gacha-machine {
+    margin-top: 1rem;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+#gacha-image, #capsule-image, #capsule-open-image {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 300px;
+    margin: 0 auto 1rem;
+    display: block;
+}
+
+#capsule-image, #capsule-open-image {
+    display: none;
+}
+
+.gacha-image.active {
+    animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+.capsule-image {
+    transition: transform 0.3s;
+}
+#capsule-image.active {
+    animation: 
+        capsuleDrop 0.6s cubic-bezier(0.2,0.8,0.4,1) forwards,
+        capsuleFloat 2s ease-in-out 0.7s infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+    will-change: transform;
+}
+@keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.05); }
+}
+
+@keyframes shake {
+    0%, 100% { transform: rotate(0); }
+    20% { transform: rotate(-5deg); }
+    40% { transform: rotate(5deg); }
+    60% { transform: rotate(-5deg); }
+    80% { transform: rotate(5deg); }
+}
+
+@keyframes capsuleDrop {
+    0% { transform: translateY(-150px) rotate(0); opacity: 0; }
+    20% { transform: translateY(-100px) rotate(90deg); opacity: 1; }
+    40% { transform: translateY(-150px) rotate(180deg); }
+    60% { transform: translateY(-75px) rotate(270deg); }
+    80% { transform: translateY(-125px) rotate(315deg); }
+    100% { transform: translateY(0) rotate(360deg); }
+}
+
+@keyframes capsuleFloat {
+    0%, 100% { transform: translateY(0) rotate(0); }
+    20% { transform: translateY(-15px) rotate(-5deg); }
+    40% { transform: translateY(0) rotate(5deg); }
+    60% { transform: translateY(-10px) rotate(-3deg); }
+    80% { transform: translateY(0) rotate(2deg); }
+}
+
+#spin-btn {
+    background-color: #FC2E79;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+#spin-btn:hover {
+    background-color: #E81B63;
+    transform: scale(1.05);
+}
+
+#spin-btn:disabled {
+    background-color: #cccccc;
+    transform: none;
+}
+
+#result {
+    margin-top: 1rem;
+    padding: 1.5rem 1rem;
+    background: url('/static/capsuleopen.png') center/contain no-repeat;
+    background-color: rgba(255,255,255,0.7);
+    background-blend-mode: overlay;
+    opacity: 0.8;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+#theme-hint {
+    color: #666;
+    font-size: 0.9rem;
+}
