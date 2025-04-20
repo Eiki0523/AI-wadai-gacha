@@ -140,7 +140,8 @@ def generate_theme(keyword=None, specific=False):
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50)
 
-            potential_item = None # ループの先頭でリセット
+            potential_item = None 
+            last_generated_item = potential_item # ループの先頭で last_generated_item を更新
             if error:
                 print(f"Step 1 エラー: {error}")
                 potential_item = None
