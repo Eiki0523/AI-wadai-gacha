@@ -126,7 +126,6 @@ def generate_theme(keyword=None, specific=False):
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
 - キーワードが「動物」なら、「アライグマ」や「キリン」など具体的な動物の名を1つ。
 出力は、選んだ具体名の単語**だけ**をテキストで返してください。例：「織田信長」
-既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50) # 具体名なので短いトークンで十分
 
@@ -152,7 +151,7 @@ def generate_theme(keyword=None, specific=False):
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
             step2_prompt = f"""
-「{specific_item}」というキーワードに必ず関連した、楽しい雑談テーマを1つ考えてください。
+「{keyword}内にある{specific_item}」というキーワードに必ず関連した、楽しい雑談テーマを1つ考えてください。
 
 形式は以下のJSON形式で**必ず**返してください。
 ```json
