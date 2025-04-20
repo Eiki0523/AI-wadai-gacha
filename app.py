@@ -130,11 +130,12 @@ def generate_theme(keyword=None, specific=False):
                 print(f"    -> 「{last_generated_item}」を避けるように指示を追加")
 
             step1_prompt = f"""
-キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**単語で挙げてください。{avoid_instruction}
+キーワード「{keyword}」に関連する**完全な固有名詞または特定のキャラクター/作品名**を**1つだけ**挙げてください。{avoid_instruction}
 例：
+- キーワードが「戦国武将」なら、「織田信長」や「武田信玄」など具体的な武将名を1つ。
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
-出力は、選んだ具体名**だけ**をテキストで返してください。例：「飛行機」
+出力は、選んだ具体名**だけ**をテキストで返してください。例：「織田信長」
 既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50)
