@@ -76,6 +76,12 @@ h1 {
     border-color: #FC2E79;
 }
 
+/* プレースホルダーのスタイル */
+#keyword-input::placeholder {
+    font-size: 0.8rem; /* 文字サイズを少し小さくする */
+    color: #aaa; /* 色を少し薄くする（任意） */
+}
+
 #add-btn {
     background-color: #4CAF50;
     color: white;
