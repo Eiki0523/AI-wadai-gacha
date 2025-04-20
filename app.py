@@ -2,11 +2,18 @@ from flask import Flask, render_template, jsonify, request
 import random
 import requests
 import json
+import os # osモジュールを追加
 
 app = Flask(__name__)
 
 # OpenRouter API設定
-OPENROUTER_API_KEY = "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"
+# 環境変数からAPIキーを読み込む
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+# APIキーが設定されていない場合のチェック
+if not OPENROUTER_API_KEY:
+    print("警告: 環境変数 'OPENROUTER_API_KEY' が設定されていません。API呼び出しは失敗します。")
+    # 必要に応じて、ここでプログラムを終了させるなどの処理を追加できます
+    # raise ValueError("APIキーが設定されていません")
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # 明るく楽しい雑談テーマを生成する関数
