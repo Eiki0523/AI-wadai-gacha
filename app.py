@@ -161,6 +161,8 @@ def generate_theme(keyword=None, specific=False):
                         # 新しいアイテム
                         specific_item = potential_item # 採用
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                        last_generated_item = potential_item # 前回のアイテムを更新
+                        consecutive_duplicates = 1 # リセット
                         break # ループを抜ける
                 else: 
                     print(f"Step 1 取得内容が不適切: {content}")
