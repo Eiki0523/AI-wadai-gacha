@@ -120,7 +120,7 @@ def generate_theme(keyword=None, specific=False):
         for attempt in range(MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
             step1_prompt = f"""
-キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**挙げてください。
+キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**単語で挙げてください。
 例：
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。

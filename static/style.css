@@ -188,3 +188,18 @@ h1 {
     color: #666;
     font-size: 0.9rem;
 }
+
+/* スマホ用チェックボックス説明文 (デフォルト非表示) */
+.checkbox-description-mobile {
+    display: none;
+    margin-top: 0.5rem; /* ボタンとの間隔 */
+    font-size: 0.8rem; /* 少し小さめの文字 */
+    color: #666; /* 少し薄めの色 */
+}
+
+/* スマホ表示用のメディアクエリ (例: 600px以下) */
+@media (max-width: 600px) {
+    .checkbox-description-mobile {
+        display: block; /* スマホでは表示 */
+    }
+}
