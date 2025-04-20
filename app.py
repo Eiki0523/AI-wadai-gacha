@@ -117,16 +117,20 @@ def generate_theme(keyword=None, specific=False):
     STEP2_MAX_RETRIES = 3
 
     if specific and keyword:
-        # --- Step 1: 具体名を取得 ---
+                # --- Step 1: 具体名を取得 ---
         specific_item = None
-        last_generated_item = None # 前回生成されたアイテムを記録
-        consecutive_duplicates = 0 # 連続重複回数を記録
-        for attempt in range(STEP1_MAX_RETRIES): # 新しい変数を使用
+        last_generated_item = None      # 前回生成されたアイテムを記録
+        consecutive_duplicates = 0      # 連続重複カウント
+
+        for attempt in range(STEP1_MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{STEP1_MAX_RETRIES}")
 
-            avoid_instruction = "" # 避ける指示を初期化
+            # 重複回避の指示
+            avoid_instruction = ""
             if consecutive_duplicates >= 3 and last_generated_item:
-                avoid_instruction = f"\n**重要:** 前回の試行で生成された「{last_generated_item}」は**絶対に避けてください**。"
+                avoid_instruction = (
+                    f"\n**重要:** 前回の試行で生成された「{last_generated_item}」は**絶対に避けてください**。"
+                )
                 print(f"    -> 「{last_generated_item}」を避けるように指示を追加")
 
             step1_prompt = f"""
@@ -135,54 +139,51 @@ def generate_theme(keyword=None, specific=False):
 - キーワードが「戦国武将」なら、「織田信長」や「武田信玄」など具体的な武将名を1つ。
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
-出力は、選んだ具体名**だけ**をテキストで返してください。例：「織田信長」
-既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
+出力は、選んだ具体名**だけ**をテキストで返してください。既存のテーマリストとは被らないように: {", ".join(generated_themes) if generated_themes else "なし"}
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50)
-
-            potential_item = None 
-            last_generated_item = potential_item # ループの先頭で last_generated_item を更新
             if error:
                 print(f"Step 1 エラー: {error}")
-                potential_item = None
-                consecutive_duplicates = 0 # エラー時は重複カウントをリセット
-                if error == "APIキー認証エラー": break # 認証エラーならリトライしない
-                continue # 他のエラーならリトライ
+                if error == "APIキー認証エラー":
+                    break
+                continue
 
-            elif content:
-                # 簡単なバリデーション
-                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
-                if 0 < len(potential_item) < 50: 
-                    print(f"    -> 取得候補: 「{potential_item}」")
-                    if potential_item == last_generated_item:
-                        # 重複
-                        consecutive_duplicates += 1 # カウンターを増やす
-                        print(f"    -> 連続重複 {consecutive_duplicates} 回目")
-                    else:
-                        # 新しいアイテム
-                        specific_item = potential_item # 採用
-                        print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                        last_generated_item = potential_item # 前回のアイテムを更新
-                        consecutive_duplicates = 1 # リセット
-                        break # ループを抜ける
-                else: 
-                    print(f"Step 1 取得内容が不適切: {content}")
-                    potential_item = None # 不適切な内容
-                    consecutive_duplicates = 0 # リセット
-            else: 
-                 print("Step 1 応答が空でした。")
-                 potential_item = None # 空応答
-                 consecutive_duplicates = 0 # リセット
+            # レスポンスから具体名抽出
+            potential_item = (
+                content.strip()
+                       .replace("「", "")
+                       .replace("」", "")
+                       .replace("\"", "")
+                if content else None
+            )
+            if potential_item and 0 < len(potential_item) < 50:
+                print(f"    -> 取得候補: 「{potential_item}」")
+                if potential_item == last_generated_item:
+                    # 重複であればカウントアップ
+                    consecutive_duplicates += 1
+                    print(f"    -> 連続重複 {consecutive_duplicates} 回目")
+                    if consecutive_duplicates >= 3:
+                        print("    -> 3回連続重複のため、次は避けるように指示を追加")
+                    continue
 
-            if consecutive_duplicates >= 3 and potential_item:
-                # 3回以上重複
-                print(f"    -> 3回以上連続重複のため、再試行します。")
-                avoid_instruction = f"\n**重要:** 「{potential_item}」は**絶対に避けてください**。"
-                # avoid_instruction を使って再試行
+                # 新しい具体名を確定
+                specific_item = potential_item
+                last_generated_item = potential_item
+                consecutive_duplicates = 1
+                print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                break
+
+            else:
+                print(f"Step 1 取得内容が不適切または空: {content}")
+                continue
 
         if not specific_item:
             print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
-            return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
+            return {
+                "theme": "ハズレ",
+                "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"
+            }
+
 
         # --- Step 2: 具体名から話題を生成 ---
         # Step 2 のリトライ回数を使用
