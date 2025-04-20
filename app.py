@@ -140,50 +140,45 @@ def generate_theme(keyword=None, specific=False):
 """
             content, error = call_openrouter_api(step1_prompt, max_tokens=50)
 
+            # ループの先頭で last_generated_item を更新
+            last_generated_item = potential_item # 前回のアイテムを更新（初回はNone）
+
             potential_item = None # ループの先頭でリセット
             if error:
                 print(f"Step 1 エラー: {error}")
-                # エラー時は重複カウントをリセット
-                last_generated_item = None
-                consecutive_duplicates = 0
+                potential_item = None
+                consecutive_duplicates = 0 # エラー時は重複カウントをリセット
                 if error == "APIキー認証エラー": break # 認証エラーならリトライしない
                 continue # 他のエラーならリトライ
 
             elif content:
                 # 簡単なバリデーション
                 potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
-                if 0 < len(potential_item) < 50: # Basic validation
+                if 0 < len(potential_item) < 50: 
                     print(f"    -> 取得候補: 「{potential_item}」")
                     if potential_item == last_generated_item:
-                        # Same item generated again
-                        consecutive_duplicates += 1
+                        # 重複
+                        consecutive_duplicates += 1 # カウンターを増やす
                         print(f"    -> 連続重複 {consecutive_duplicates} 回目")
-                        if consecutive_duplicates >= 3:
-                            # Too many duplicates, continue loop to force a different item next time
-                            print(f"    -> 3回以上連続重複のため、再試行します。")
-                            # last_generated_item は維持して avoid_instruction で使う
-                            continue # Skip to next iteration
-                        else:
-                            # Not yet 3 duplicates, but still a duplicate, so try again
-                            print(f"    -> 重複のため、再試行します。")
-                            # last_generated_item は維持
-                            continue # Skip to next iteration
                     else:
-                        # Different item generated - This is what we want!
-                        specific_item = potential_item # Accept the new item
+                        # 新しいアイテム
+                        specific_item = potential_item # 採用
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                        last_generated_item = potential_item # Update tracker
-                        consecutive_duplicates = 1 # Reset counter
-                        break # Exit the loop
-                else: # Validation failed
+                        break # ループを抜ける
+                else: 
                     print(f"Step 1 取得内容が不適切: {content}")
-                    last_generated_item = None # リセット
+                    potential_item = None # 不適切な内容
                     consecutive_duplicates = 0 # リセット
-            else: # content is empty
+            else: 
                  print("Step 1 応答が空でした。")
-                 last_generated_item = None # リセット
+                 potential_item = None # 空応答
                  consecutive_duplicates = 0 # リセット
-            # リトライ時は last_generated_item と consecutive_duplicates は維持される
+
+            if consecutive_duplicates >= 3 and potential_item:
+                # 3回以上重複
+                print(f"    -> 3回以上連続重複のため、再試行します。")
+                avoid_instruction = f"\n**重要:** 「{potential_item}」は**絶対に避けてください**。"
+                # avoid_instruction を使って再試行
 
         if not specific_item:
             print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
