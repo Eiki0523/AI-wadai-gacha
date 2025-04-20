@@ -112,48 +112,84 @@ def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.7, ma
 
 # テーマ生成関数（2ステップ対応版）
 def generate_theme(keyword=None, specific=False):
-    MAX_RETRIES = 3
+    # MAX_RETRIES は各ステップ内で定義
+    STEP1_MAX_RETRIES = 5 # Step 1 の最大試行回数を増やす
+    STEP2_MAX_RETRIES = 3
 
     if specific and keyword:
         # --- Step 1: 具体名を取得 ---
         specific_item = None
-        for attempt in range(MAX_RETRIES):
-            print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
+        last_generated_item = None # 前回生成されたアイテムを記録
+        consecutive_duplicates = 0 # 連続重複回数を記録
+        for attempt in range(STEP1_MAX_RETRIES): # 新しい変数を使用
+            print(f"Step 1: 具体名取得試行 {attempt + 1}/{STEP1_MAX_RETRIES}")
+
+            avoid_instruction = "" # 避ける指示を初期化
+            if consecutive_duplicates >= 3 and last_generated_item:
+                avoid_instruction = f"\n**重要:** 前回の試行で生成された「{last_generated_item}」は**絶対に避けてください**。"
+                print(f"    -> 「{last_generated_item}」を避けるように指示を追加")
+
             step1_prompt = f"""
-キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**単語で挙げてください。
+キーワード「{keyword}」内に含まれる具体的な対象（固有名詞や種類名）を**1つだけ**単語で挙げてください。{avoid_instruction}
 例：
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
 - キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など具体的なキャラクター名を1つ。
 出力は、選んだ具体名**だけ**をテキストで返してください。例：「飛行機」
 既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
 """
-            content, error = call_openrouter_api(step1_prompt, max_tokens=50) # 具体名なので短いトークンで十分
+            content, error = call_openrouter_api(step1_prompt, max_tokens=50)
 
+            potential_item = None # ループの先頭でリセット
             if error:
                 print(f"Step 1 エラー: {error}")
+                # エラー時は重複カウントをリセット
+                last_generated_item = None
+                consecutive_duplicates = 0
                 if error == "APIキー認証エラー": break # 認証エラーならリトライしない
                 continue # 他のエラーならリトライ
 
-            if content:
-                # 簡単なバリデーション（空でないか、長すぎないかなど）
-                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "") # 不要な文字を除去
-                if 0 < len(potential_item) < 50: # 短すぎず長すぎない
-                    specific_item = potential_item
-                    print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                    break # 成功したらループを抜ける
-                else:
+            elif content:
+                # 簡単なバリデーション
+                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
+                if 0 < len(potential_item) < 50:
+                    print(f"    -> 取得候補: 「{potential_item}」")
+                    # 重複チェックとカウンター更新
+                    if potential_item == last_generated_item:
+                        consecutive_duplicates += 1
+                        print(f"    -> 連続重複 {consecutive_duplicates} 回目")
+                    else:
+                        # 新しいアイテムが生成されたらカウンターリセット
+                        last_generated_item = potential_item
+                        consecutive_duplicates = 1 # 新しいアイテムなので1回目
+                        print(f"    -> 新しい候補。連続重複リセット(1回目)")
+
+                    # 3回未満の重複なら採用してループを抜ける
+                    if consecutive_duplicates < 3:
+                         specific_item = potential_item
+                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                         break # 成功したらループを抜ける
+                    # 3回以上重複した場合は、ループの次の試行へ (avoid_instruction が追加される)
+
+                else: # バリデーション失敗
                     print(f"Step 1 取得内容が不適切: {content}")
-            else:
+                    # 不適切な内容でも重複カウントはリセット
+                    last_generated_item = None
+                    consecutive_duplicates = 0
+            else: # content が空の場合
                  print("Step 1 応答が空でした。")
-            # 成功しなかった場合はリトライ
+                 # 応答が空でも重複カウントはリセット
+                 last_generated_item = None
+                 consecutive_duplicates = 0
+            # 成功しなかった場合 (3回重複含む) はリトライ
 
         if not specific_item:
-            print("Step 1: 最大試行回数でも具体名を取得できませんでした。")
+            print(f"Step 1: 最大試行回数 ({STEP1_MAX_RETRIES}回) でも適切な具体名を取得できませんでした。")
             return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
 
         # --- Step 2: 具体名から話題を生成 ---
-        for attempt in range(MAX_RETRIES):
-            print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
+        # Step 2 のリトライ回数を使用
+        for attempt in range(STEP2_MAX_RETRIES):
+            print(f"Step 2: 話題生成試行 {attempt + 1}/{STEP2_MAX_RETRIES} (具体名: {specific_item})")
             step2_prompt = f"""
 「{specific_item}」というキーワード({keyword}に含まれる)に必ず関連した、楽しい雑談テーマを1つ考えてください。
 
@@ -214,8 +250,10 @@ def generate_theme(keyword=None, specific=False):
 
     else:
         # --- specific=False または keywordなし の場合 (従来通り) ---
-        for attempt in range(MAX_RETRIES):
-            print(f"通常生成試行 {attempt + 1}/{MAX_RETRIES}")
+        # 通常生成のリトライ回数 (Step 2 と同じで良いか、別途定義するか)
+        NORMAL_MAX_RETRIES = 3 # ここでは仮に3回
+        for attempt in range(NORMAL_MAX_RETRIES):
+            print(f"通常生成試行 {attempt + 1}/{NORMAL_MAX_RETRIES}")
             # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを生成
             full_prompt = create_prompt(keyword, specific=False) # specific=False を明示
             # JSON形式を期待するプロンプトなので、system メッセージも調整
