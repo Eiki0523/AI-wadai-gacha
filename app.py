@@ -96,75 +96,192 @@ def create_prompt(keyword=None, specific=False):
     full_prompt = prompt.replace("{existing_themes}", existing_themes_str)
     return full_prompt
 
-def generate_theme(keyword=None, specific=False): # specific パラメータを追加
-    # プロンプト生成をヘルパー関数に任せる
-    full_prompt = create_prompt(keyword, specific)
-    
+# API呼び出しを行うヘルパー関数
+def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.7, max_tokens=150):
+    if not OPENROUTER_API_KEY:
+        print("エラー: APIキーが設定されていません。")
+        return None, "APIキー未設定エラー"
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json"
     }
-    
     payload = {
-        "model": "openai/gpt-4.1-nano",
+        "model": model,
         "messages": [
-            {"role": "system", "content": "あなたは楽しい会話のテーマを考えるアシスタントです"},
-            {"role": "user", "content": full_prompt}
+            {"role": "system", "content": "あなたは指示に従ってテキストを生成するアシスタントです。"},
+            {"role": "user", "content": prompt}
         ],
-        "temperature": 0.7,
-        "max_tokens": 150
+        "temperature": temperature,
+        "max_tokens": max_tokens
     }
 
-    MAX_RETRIES = 3 # 最大再試行回数
+    try:
+        response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload, timeout=30) # タイムアウト設定
+        response.raise_for_status()
+        result = response.json()
+        content = result['choices'][0]['message']['content']
+        return content, None # 成功時はコンテンツとNone(エラーなし)を返す
+    except requests.exceptions.Timeout:
+        print("APIリクエストがタイムアウトしました。")
+        return None, "タイムアウトエラー"
+    except requests.exceptions.RequestException as e:
+        print(f"APIリクエストエラー: {e}")
+        # 401エラーの場合は特別なメッセージを出すなど、詳細なハンドリングも可能
+        if response.status_code == 401:
+             return None, "APIキー認証エラー"
+        return None, f"APIリクエストエラー ({response.status_code})"
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        print(f"API応答の解析エラー: {e}")
+        return None, "API応答解析エラー"
+    except Exception as e:
+        print(f"予期せぬAPI関連エラー: {e}")
+        return None, "予期せぬAPIエラー"
 
-    for attempt in range(MAX_RETRIES):
-        try:
-            response = requests.post(OPENROUTER_API_URL, headers=headers, json=payload)
-            response.raise_for_status() # HTTPエラーチェック
-            result = response.json()
+# テーマ生成関数（2ステップ対応版）
+def generate_theme(keyword=None, specific=False):
+    MAX_RETRIES = 3
 
-            # JSON形式で返す
-            content_str = result['choices'][0]['message']['content']
-            # マークダウンのコードブロック形式を取り除く (復活！)
-            cleaned_content_str = content_str.strip().removeprefix("```json").removesuffix("```").strip()
-            theme_data = json.loads(cleaned_content_str) # JSONパース
-            theme = theme_data.get("theme", "楽しい話題")
-            hint = theme_data.get("hint", "おもろい話")
+    if specific and keyword:
+        # --- Step 1: 具体名を取得 ---
+        specific_item = None
+        for attempt in range(MAX_RETRIES):
+            print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
+            step1_prompt = f"""
+キーワード「{keyword}」に関連する具体的な対象（固有名詞や種類名）を**1つだけ**挙げてください。
+例：
+- キーワードが「乗り物」なら、「飛行機」や「潜水艦」など。
+- キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など。
+- キーワードが「ドラゴンボール」なら、「孫悟空」や「フリーザ」など。
+出力は、選んだ具体名**だけ**をテキストで返してください。例：「飛行機」
+既存のテーマリストとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
+"""
+            content, error = call_openrouter_api(step1_prompt, max_tokens=50) # 具体名なので短いトークンで十分
 
-            # テーマが重複していないか確認
-            if theme not in generated_themes:
-                generated_themes.add(theme)
-                # print(f"新しいテーマを追加: {theme}") # デバッグ用
-                return { # 成功！テーマを返す
-                    "theme": theme,
-                    "hint": hint
-                }
+            if error:
+                print(f"Step 1 エラー: {error}")
+                if error == "APIキー認証エラー": break # 認証エラーならリトライしない
+                continue # 他のエラーならリトライ
+
+            if content:
+                # 簡単なバリデーション（空でないか、長すぎないかなど）
+                potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "") # 不要な文字を除去
+                if 0 < len(potential_item) < 50: # 短すぎず長すぎない
+                    specific_item = potential_item
+                    print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                    break # 成功したらループを抜ける
+                else:
+                    print(f"Step 1 取得内容が不適切: {content}")
             else:
-                # 重複した場合
-                print(f"テーマ「{theme}」が重複しました。再抽選します。(試行 {attempt + 1}/{MAX_RETRIES})")
-                # 次のループで再試行
+                 print("Step 1 応答が空でした。")
+            # 成功しなかった場合はリトライ
 
-        except requests.exceptions.RequestException as e:
-            print(f"APIリクエストエラー (試行 {attempt + 1}/{MAX_RETRIES}): {e}")
-            # リクエスト自体に失敗した場合はループを抜けてハズレを返す
-            break
-        except json.JSONDecodeError as e:
-             print(f"JSONパースエラー (試行 {attempt + 1}/{MAX_RETRIES}): {e}")
-             # パースできなかった内容を表示 (cleaned_content_str の前なので元の content_str を表示)
-             print(f"応答内容: {content_str}")
-             # JSONパースに失敗した場合もループを抜けてハズレを返す
-             break
-        except Exception as e:
-            # その他の予期せぬエラー
-            print(f"予期せぬエラー (試行 {attempt + 1}/{MAX_RETRIES}): {e}")
-            break # ループを抜けてハズレを返す
+        if not specific_item:
+            print("Step 1: 最大試行回数でも具体名を取得できませんでした。")
+            return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試してみて！"}
 
-    # ループが完了してもユニークなテーマが見つからなかった場合、または途中でエラーが発生した場合
-    print(f"{MAX_RETRIES}回の試行でユニークなテーマを取得できませんでした。")
-    return {
-        "theme": "ハズレ",
-        "hint": "空のカプセルが出てきちゃった！もう一度回そう"
-        }
+        # --- Step 2: 具体名から話題を生成 ---
+        for attempt in range(MAX_RETRIES):
+            print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
+            step2_prompt = f"""
+「{specific_item}」というテーマについて、**雑談に使える楽しい話題**を1つ考えてください。
+その話題は、「{specific_item}」を知らない人でも少し興味を持てるように、軽い豆知識、簡単な質問、共感しやすい「あるある」、面白い小ネタなどを**含めてください**。
+
+形式は以下のJSON形式で**必ず**返してください。
+```json
+{{
+    "theme": "具体的な話題",
+    "hint": "会話のきっかけ（豆知識、質問、あるある、小ネタなど）"
+}}
+```
+例：
+```json
+{{
+    "theme": "飛行機に乗るときのワクワク感",
+    "hint": "窓側の席が好き？通路側？離陸の瞬間のGがかかる感じ、たまらないよね！"
+}}
+```
+```json
+{{
+    "theme": "ピッコロ記念日って知ってる？",
+    "hint": "実は5月9日はファンの間でピッコロ記念日と呼ばれてるらしいよ。なんでだと思う？"
+}}
+```
+生成済みのテーマとは被らないようにしてください: {", ".join(generated_themes) if generated_themes else "なし"}
+"""
+            content, error = call_openrouter_api(step2_prompt) # 通常のトークン数
+
+            if error:
+                print(f"Step 2 エラー: {error}")
+                if error == "APIキー認証エラー": break
+                continue
+
+            if content:
+                try:
+                    # マークダウン形式の除去を試みる
+                    cleaned_content_str = content.strip().removeprefix("```json").removesuffix("```").strip()
+                    theme_data = json.loads(cleaned_content_str)
+                    theme = theme_data.get("theme")
+                    hint = theme_data.get("hint")
+
+                    if theme and hint and theme not in generated_themes:
+                        generated_themes.add(theme)
+                        print(f"Step 2 成功: テーマ「{theme}」")
+                        return {"theme": theme, "hint": hint}
+                    elif theme in generated_themes:
+                        print(f"Step 2 テーマ重複: {theme}")
+                    else:
+                        print(f"Step 2 JSON形式不正: {content}")
+
+                except json.JSONDecodeError:
+                    print(f"Step 2 JSONパースエラー: {content}")
+            else:
+                print("Step 2 応答が空でした。")
+            # 成功しなかった場合はリトライ
+
+        print(f"Step 2: 最大試行回数でも話題を生成できませんでした (具体名: {specific_item})。")
+        return {"theme": "ハズレ", "hint": f"「{specific_item}」からうまく話題を作れなかった…ごめんね！"}
+
+    else:
+        # --- specific=False または keywordなし の場合 (従来通り) ---
+        for attempt in range(MAX_RETRIES):
+            print(f"通常生成試行 {attempt + 1}/{MAX_RETRIES}")
+            # create_prompt はキーワードのみ、またはキーワードなしのプロンプトを生成
+            full_prompt = create_prompt(keyword, specific=False) # specific=False を明示
+            # JSON形式を期待するプロンプトなので、system メッセージも調整
+            system_message = "あなたは楽しい会話のテーマをJSON形式で考えるアシスタントです。"
+            # API呼び出し (call_openrouter_api を使うように変更)
+            content, error = call_openrouter_api(full_prompt) # model, temp, max_tokens はデフォルト値を使用
+
+            if error:
+                print(f"通常生成エラー: {error}")
+                if error == "APIキー認証エラー": break
+                continue # 他のエラーならリトライ
+
+            if content:
+                try:
+                    cleaned_content_str = content.strip().removeprefix("```json").removesuffix("```").strip()
+                    theme_data = json.loads(cleaned_content_str)
+                    theme = theme_data.get("theme")
+                    hint = theme_data.get("hint")
+
+                    if theme and hint and theme not in generated_themes:
+                        generated_themes.add(theme)
+                        print(f"通常生成成功: テーマ「{theme}」")
+                        return {"theme": theme, "hint": hint}
+                    elif theme in generated_themes:
+                        print(f"通常生成 テーマ重複: {theme}")
+                    else:
+                        print(f"通常生成 JSON形式不正: {content}")
+                except json.JSONDecodeError:
+                    print(f"通常生成 JSONパースエラー: {content}")
+            else:
+                print("通常生成 応答が空でした。")
+            # 成功しなかった場合はリトライ
+
+        print("通常生成: 最大試行回数でもユニークなテーマを取得できませんでした。")
+        return {"theme": "ハズレ", "hint": "空のカプセルが出てきちゃった！もう一度回そう"}
+
 
 @app.route('/')
 def index():
