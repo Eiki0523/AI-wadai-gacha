@@ -171,7 +171,7 @@ def generate_theme(keyword=None, specific=False):
                         # Different item generated - This is what we want!
                         specific_item = potential_item # Accept the new item
                         last_generated_item = potential_item # Update tracker for next potential duplicate check
-                        consecutive_duplicates = 1 # Reset counter as we have a new item
+                        consecutive_duplicates = 0 # Reset counter as we have a new item
                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
                         break # Exit the loop successfully
                 else: # Validation failed
