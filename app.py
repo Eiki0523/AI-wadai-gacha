@@ -178,14 +178,13 @@ def generate_theme(keyword=None, specific=False):
 
         if not specific_item:
             print("Step 1: 最大試行回数でも具体名を取得できませんでした。")
-            return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試してみて！"}
+            return {"theme": "ハズレ", "hint": "うまく具体化できなかったみたい…もう一度試すかキーワードを変えてみて！"}
 
         # --- Step 2: 具体名から話題を生成 ---
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
             step2_prompt = f"""
 「{specific_item}」というテーマについて、**雑談に使える楽しい話題**を1つ考えてください。
-その話題は、「{specific_item}」を知らない人でも少し興味を持てるように、軽い豆知識、簡単な質問、共感しやすい「あるある」、面白い小ネタなどを**含めてください**。
 
 形式は以下のJSON形式で**必ず**返してください。
 ```json
