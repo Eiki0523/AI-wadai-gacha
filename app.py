@@ -151,31 +151,35 @@ def generate_theme(keyword=None, specific=False):
             elif content:
                 # 簡単なバリデーション
                 potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "")
-                if 0 < len(potential_item) < 50:
+                if 0 < len(potential_item) < 50: # Basic validation
                     print(f"    -> 取得候補: 「{potential_item}」")
-                    # 重複チェックとカウンター更新
                     if potential_item == last_generated_item:
+                        # Same item generated again
                         consecutive_duplicates += 1
                         print(f"    -> 連続重複 {consecutive_duplicates} 回目")
+                        if consecutive_duplicates >= 3:
+                            # Too many duplicates, continue loop to force a different item next time
+                            print(f"    -> 3回以上連続重複のため、再試行します。")
+                            # last_generated_item は維持して avoid_instruction で使う
+                            continue # Skip to next iteration
+                        else:
+                            # Not yet 3 duplicates, but still a duplicate, so try again
+                            print(f"    -> 重複のため、再試行します。")
+                            # last_generated_item は維持
+                            continue # Skip to next iteration
                     else:
-                        # 新しいアイテムが生成されたらカウンターリセット
-                        last_generated_item = potential_item
-                        consecutive_duplicates = 1 # 新しいアイテムなので1回目
-                        print(f"    -> 新しい候補。連続重複リセット(1回目)")
-
-                    # 3回未満の重複なら採用してループを抜ける
-                    if consecutive_duplicates < 3:
-                         specific_item = potential_item
-                         print(f"Step 1 成功: 具体名「{specific_item}」を取得")
-                         break # 成功したらループを抜ける
-                    # 3回以上重複した場合は、ループの次の試行へ (avoid_instruction が追加される)
-
-                else: # バリデーション失敗
+                        # Different item generated - This is what we want!
+                        specific_item = potential_item # Accept the new item
+                        last_generated_item = potential_item # Update tracker for next potential duplicate check
+                        consecutive_duplicates = 1 # Reset counter as we have a new item
+                        print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                        break # Exit the loop successfully
+                else: # Validation failed
                     print(f"Step 1 取得内容が不適切: {content}")
-                    # 不適切な内容でも重複カウントはリセット
+                    # Reset duplicate tracking as the content was invalid
                     last_generated_item = None
                     consecutive_duplicates = 0
-            else: # content が空の場合
+            else: # content is empty
                  print("Step 1 応答が空でした。")
                  # 応答が空でも重複カウントはリセット
                  last_generated_item = None
