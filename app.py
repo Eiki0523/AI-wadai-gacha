@@ -274,8 +274,6 @@ def index():
 
 @app.route('/spin')
 def spin():
-    global generated_themes
-    generated_themes = set()  # generated_themesをリセット
     keyword = request.args.get('keyword')
     # specific パラメータを取得 (文字列 'true' かどうかで判定)
     is_specific = request.args.get('specific') == 'true'
