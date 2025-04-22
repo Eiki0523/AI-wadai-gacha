@@ -19,8 +19,8 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 明るく楽しい雑談テーマを生成する関数
 # 生成済みテーマを記録するセット
 generated_themes = set()
-# 直近の具体名を記録するdeque (最大5件)
-recent_specific_items = deque(maxlen=5)
+# 直近の具体名を記録するdeque (最大7件)
+recent_specific_items = deque(maxlen=7)
 
 # プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
 def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
