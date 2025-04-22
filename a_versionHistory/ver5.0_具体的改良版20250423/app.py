@@ -1,8 +1,7 @@
 from flask import Flask, render_template, jsonify, request
 import requests
 import json
-import os
-from collections import deque
+import os 
 
 app = Flask(__name__)
 
@@ -19,8 +18,6 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 # 明るく楽しい雑談テーマを生成する関数
 # 生成済みテーマを記録するセット
 generated_themes = set()
-# 直近の具体名を記録するdeque (最大5件)
-recent_specific_items = deque(maxlen=5)
 
 # プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
 def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
@@ -137,17 +134,12 @@ def generate_theme(keyword=None, specific=False):
                 if error == "APIキー認証エラー": break # 認証エラーならリトライしない
                 continue # 他のエラーならリトライ
 
-            # content が返ってきたらバリデーションと重複チェック
+            # content が返ってきたらバリデーション
             potential_item = content.strip().replace("\"", "").replace("「", "").replace("」", "") # 不要な文字を除去
             if 0 < len(potential_item) < 50:
-                if potential_item in recent_specific_items:
-                    print(f"Step 1 重複検出: 具体名「{potential_item}」は最近使用されました。再試行します。")
-                    continue # 重複している場合は再試行
-                else:
-                    specific_item = potential_item
-                    recent_specific_items.append(specific_item) # 新しい具体名をdequeに追加 (古いものは自動で削除される)
-                    print(f"Step 1 成功: 具体名「{specific_item}」を取得 (最近の具体名: {list(recent_specific_items)})")
-                    break # 有効で重複しない具体名が見つかったのでループを抜ける
+                specific_item = potential_item
+                print(f"Step 1 成功: 具体名「{specific_item}」を取得")
+                break
             else:
                 print(f"Step 1 取得内容が不適切: {content}")
 
