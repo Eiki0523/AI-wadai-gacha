@@ -122,8 +122,15 @@ def generate_theme(keyword=None, specific=False):
         specific_item = None
         for attempt in range(MAX_STEP1_RETRIES): # Step1専用のリトライ回数を使用
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_STEP1_RETRIES}")
+
+            # --- プロンプトでの回避指示 (JSON形式) を追加 ---
+            avoid_list = list(recent_specific_items) # dequeをリストに変換
+            avoid_list_json = json.dumps(avoid_list, ensure_ascii=False) # リストをJSON文字列に変換 (日本語対応)
+            avoid_instruction = f"\n**ただし、以下のJSONリストに含まれる単語は避けてください: {avoid_list_json}**" if avoid_list else "" # リストが空でなければ指示を追加
+            # --- ここまで追加 ---
+
             step1_prompt = f"""
-キーワード「{keyword}」に属する**固有名詞またはキャラクター**を被りがないように**1つだけ**挙げてください。
+キーワード「{keyword}」に属する**固有名詞またはキャラクター**を被りがないように**1つだけ**挙げてください。{avoid_instruction}
 例：
 - キーワードが「戦国武将」なら、「織田信長」や「武田信玄」など具体的な武将名を1つ。
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
