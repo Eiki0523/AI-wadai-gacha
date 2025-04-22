@@ -22,7 +22,7 @@ generated_themes = set()
 # プロンプトを生成するヘルパー関数 (specific=False または keywordなし の場合のみ担当)
 def create_prompt(keyword=None, specific=False): # specific引数はgenerate_themeからの呼び出し整合性のために残す
     base_prompt = """
-    形式は以下のJSON形式で返してください。
+    形式は以下のJSON形式で**必ず**返してください。
     {
         "theme": "具体的な話題",
         "hint": "会話のきっかけ"
@@ -150,16 +150,36 @@ def generate_theme(keyword=None, specific=False):
         # --- Step 2: 具体名から話題を生成 ---
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
-            instruction = f"「{specific_item}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください。 ({keyword}に関する)"
+            instruction = f"「{specific_item}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください({keyword}に関する)。"
             base_prompt = """
-形式は以下のJSON形式で**必ず**返してください。
-```json
-{
-    "theme": "具体的な話題",
-    "hint": "会話のきっかけ"
-}
-```
-"""
+    形式は以下のJSON形式で返してください。
+    {
+        "theme": "具体的な話題",
+        "hint": "会話のきっかけ"
+    }
+    例:
+    {
+        "theme": "夏の思い出",
+        "hint": "子供の頃の夏休みの思い出や、最近の夏の楽しみ方を話してみよう"
+
+        "theme": "映画館で頼む食べ物",
+        "hint": "楽しい映画には外せない,美味しいグルメについて語ろう"
+
+        "theme": "学生時代の失敗談",
+        "hint": "思い出したくない黒歴史,今だから笑える失敗を思い出そう"
+
+        "theme": "異世界に行ったら何をしたい？",
+        "hint": "もし異世界に行ったら魔法使いとして旅に出る？街で商売して大儲け？"
+    }
+
+    以下の条件を厳守してください:
+    - 楽しくて盛り上がる話題
+    - 現実的でリアルなお題含む
+    - 恋愛や仕事、学校に関する話題含む
+    - 想像が膨らみやすい話題含む
+    - ユーモアがあるお題含む
+    - 具体的で想像しやすいお題とヒント
+    """
             step2_prompt = instruction + base_prompt
             content, error = call_openrouter_api(step2_prompt) 
             if error:
