@@ -119,7 +119,7 @@ def generate_theme(keyword=None, specific=False):
         for attempt in range(MAX_RETRIES):
             print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
             step1_prompt = f"""
-キーワード「{keyword}」に関連する**完全な固有名詞または特定のキャラクター**を**1つだけ**挙げてください。
+キーワード「{keyword}」に属する**固有名詞またはキャラクター**を被りがないように**1つだけ**挙げてください。
 例：
 - キーワードが「戦国武将」なら、「織田信長」や「武田信玄」など具体的な武将名を1つ。
 - キーワードが「アニメ」なら、「鬼滅の刃」や「呪術廻戦」など具体的な作品名を1つ。
@@ -150,16 +150,17 @@ def generate_theme(keyword=None, specific=False):
         # --- Step 2: 具体名から話題を生成 ---
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
-            step2_prompt = f"""
-「{keyword}内にある{specific_item}」というキーワードに必ず関連した、楽しい雑談テーマを1つ考えてください。
-
+            instruction = f"「{keyword}内にある{specific_item}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください。"
+            base_prompt = """
 形式は以下のJSON形式で**必ず**返してください。
 ```json
-{{
+{
     "theme": "具体的な話題",
     "hint": "会話のきっかけ"
-}}
-""" 
+}
+```
+"""
+            step2_prompt = instruction + base_prompt
             content, error = call_openrouter_api(step2_prompt) 
             if error:
                 print(f"Step 2 エラー: {error}")
