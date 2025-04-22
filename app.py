@@ -150,7 +150,7 @@ def generate_theme(keyword=None, specific=False):
         # --- Step 2: 具体名から話題を生成 ---
         for attempt in range(MAX_RETRIES):
             print(f"Step 2: 話題生成試行 {attempt + 1}/{MAX_RETRIES} (具体名: {specific_item})")
-            instruction = f"「{keyword}内にある{specific_item}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください。"
+            instruction = f"「{specific_item}」というキーワードに必ず関連した、明るく楽しい雑談テーマを1つ考えてください。 ({keyword}に関する)"
             base_prompt = """
 形式は以下のJSON形式で**必ず**返してください。
 ```json
