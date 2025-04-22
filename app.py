@@ -114,13 +114,14 @@ def call_openrouter_api(prompt, model="openai/gpt-4.1-nano", temperature=0.9, ma
 
 # テーマ生成関数（2ステップ対応版）
 def generate_theme(keyword=None, specific=False):
-    MAX_RETRIES = 3
+    MAX_RETRIES = 3 # Step2 と 通常生成 の最大リトライ回数
+    MAX_STEP1_RETRIES = 7 # Step1 (具体名取得) の最大リトライ回数
 
     if specific and keyword:
         # --- Step 1: 具体名を取得 ---
         specific_item = None
-        for attempt in range(MAX_RETRIES):
-            print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_RETRIES}")
+        for attempt in range(MAX_STEP1_RETRIES): # Step1専用のリトライ回数を使用
+            print(f"Step 1: 具体名取得試行 {attempt + 1}/{MAX_STEP1_RETRIES}")
             step1_prompt = f"""
 キーワード「{keyword}」に属する**固有名詞またはキャラクター**を被りがないように**1つだけ**挙げてください。
 例：
